@@ -118,6 +118,7 @@ def deal_video_data(conn,addr):
             break
     print("video done!")
     conn.close()
+    
            
         
      
