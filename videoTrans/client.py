@@ -111,5 +111,5 @@ if __name__ == '__main__':
 
     #size = client.sendIMG('dog.jpg')
     #client.recvIMG(size)
-    client.sendVideo('/mnt/f/video/test3.mp4')
+    client.sendVideo('../test.mp4')
     client.closeSocket()
