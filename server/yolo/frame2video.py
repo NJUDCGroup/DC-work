@@ -9,6 +9,9 @@ from PIL import Image
 def frame2video(im_dir,video_dir,fps):
  
     im_list = os.listdir(im_dir)
+    #debug
+    #os.system("echo $(ls -R ./frame/orig/*.jpg)")
+    #print(im_list)
 #    im_list.sort(key=lambda x: int(x.replace("frame","").split('.')[0]))  #最好再看看图片顺序对不
     img = Image.open(os.path.join(im_dir,im_list[0]))
     img_size = img.size #获得图片分辨率，im_dir文件夹下的图片分辨率需要一致
@@ -33,7 +36,7 @@ def frame2video(im_dir,video_dir,fps):
 if __name__ == '__main__':
     im_dir = './frame/pred/'#帧存放路径
     video_dir = './pred.mp4' #合成视频存放的路径,need to be modified
-    fps = 5 #帧率，每秒钟帧数越多，所显示的动作就会越流畅,can be modified
+    fps = 10 #帧率，每秒钟帧数越多，所显示的动作就会越流畅,can be modified
     frame2video(im_dir, video_dir, fps)
 
 

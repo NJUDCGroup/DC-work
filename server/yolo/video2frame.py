@@ -32,6 +32,6 @@ def video2frame(videos_path,frames_save_path,time_interval):
 if __name__ == '__main__':
    videos_path = '../test.mp4'
    frames_save_path = './frame/orig/'#need to be modified
-   time_interval = 3#隔一帧保存一次,can be modified
+   time_interval = 1#隔一帧保存一次,can be modified
    video2frame(videos_path, frames_save_path, time_interval)
-   os.system("ls -R ./frame/orig/*.jpg > ./frame/orig/input.txt")
+   #os.system("ls -R ./frame/orig/*.jpg > ./frame/orig/input.txt") this command placed to the main function
