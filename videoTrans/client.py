@@ -107,7 +107,7 @@ class Client():
                 
 if __name__ == '__main__':
     client = Client()
-    client.setup('127.0.0.1',8002)
+    client.setup('127.0.0.1',8004)
 
     #size = client.sendIMG('dog.jpg')
     #client.recvIMG(size)
