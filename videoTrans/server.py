@@ -106,9 +106,6 @@ def deal_video_data(conn,addr):
         length = conn.recv(16) #首先接收来自客户端发送的大小信息        
         if isinstance(length,str):
             len = int(length)
-	    #debug
-	    print(len)
-	    print(length)
             stringData = conn.recv(len)
             # 对接收到的内容解码为图片形式
             data = numpy.fromstring(stringData,dtype='uint8')
@@ -127,6 +124,6 @@ def deal_video_data(conn,addr):
      
 if __name__ == "__main__":
     server = Server()
-    server.setup('127.0.0.1',8002)
+    server.setup('127.0.0.1',8004)
     server.serverStart(deal_video_data)  
             
