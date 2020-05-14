@@ -75,6 +75,8 @@ class Client():
             encode_param=[int(cv.IMWRITE_JPEG_QUALITY),90] #设置编码参数
             if cap.isOpened(): #获取视频帧率
                 fps = cap.get(cv.CAP_PROP_FPS)
+                total_frame = cap.get(cv.CAP_PROP_FRAME_COUNT)
+                print(total_frame)
                 sleepTime = int(1000/fps)
                 # 发送视频帧率
                 self.s.send(str(fps).ljust(8))
@@ -99,15 +101,17 @@ class Client():
                 self.s.send(str(len(stringData)).ljust(16).encode())
                 # 然后发送图片内容
                 self.s.send(stringData)
+                '''
                 if cv.waitKey(sleepTime) == ord('q'):
                     print("video sending has been break")
                     break
+                '''
             print("video sending over!")
             cap.release()
                 
 if __name__ == '__main__':
     client = Client()
-    client.setup('127.0.0.1',8004)
+    client.setup('127.0.0.1',8005)
 
     #size = client.sendIMG('dog.jpg')
     #client.recvIMG(size)

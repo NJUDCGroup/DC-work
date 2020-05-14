@@ -100,22 +100,28 @@ def deal_video_data(conn,addr):
     conn.send('Hi, Welcome to the server!'.encode('utf-8'))
     fps = conn.recv(16).decode().strip(' ')
     print("video fps is \'{}\'".format(fps))
+    player_queue = [] # 可扩展播放缓存队列
     
     sleepTime = int(1000/float(fps))
     while 1:
         length = conn.recv(16) #首先接收来自客户端发送的大小信息        
-        if isinstance(length,str):
-            len = int(length)
-            stringData = conn.recv(len)
+        if isinstance(length,str) and length:
+            #print(length)
+            l = int(length)
+            stringData = conn.recv(l)
             # 对接收到的内容解码为图片形式
             data = numpy.fromstring(stringData,dtype='uint8')
             decimg = cv.imdecode(data,1)
+            player_queue.append(decimg)
             # 播放画面
-            cv.imshow('SERVER',decimg)
+            #cv.imshow('SERVER',decimg)
         else:
             break
+        '''
         if cv.waitKey(sleepTime)==ord('q'):
             break
+        '''
+    print(len(player_queue))
     print("video done!")
     conn.close()
     
@@ -124,6 +130,6 @@ def deal_video_data(conn,addr):
      
 if __name__ == "__main__":
     server = Server()
-    server.setup('127.0.0.1',8004)
+    server.setup('127.0.0.1',8005)
     server.serverStart(deal_video_data)  
             
