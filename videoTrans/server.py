@@ -7,33 +7,7 @@ import os
 import numpy
 import cv2 as cv
 import time
-class Server():
-    def __init__(self):
-        pass
-    def setup(self,ip,port):
-        try:
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            # 绑定端口为9001
-            self.s.bind((ip, port))
-            # 设置监听数
-            self.s.listen(10)
-        except socket.error as msg:
-            print (msg)
-            sys.exit(1)
-        print("setup finish")
-        
-    def serverStart(self,server_method):
-        print ('Waiting connection...')
-        
-        while 1:
-            # 等待请求并接受(程序会停留在这一旦收到连接请求即开启接受数据的线程)
-            conn, addr = self.s.accept()
-            # 接收数据
-            t = threading.Thread(target=server_method, args=(conn, addr))
-            t.start()
-     
-     
+from multiprocessing import Process,Value 
 def deal_data(conn, addr):
     print ('Accept new connection from {0}'.format(addr))
     # conn.settimeout(500)
@@ -91,8 +65,66 @@ def deal_data(conn, addr):
             
         # 传输结束断开连接
         conn.close()
-        break   
+        break  
+class Server():
+    def __init__(self):
+        pass
+    def setup(self,ip,port):
+        try:
+            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            # 绑定端口为9001
+            self.s.bind((ip, port))
+            # 设置监听数
+            self.s.listen(10)
+        except socket.error as msg:
+            print (msg)
+            sys.exit(1)
+        print("setup finish")
+        
+    def serverStart(self,server_method):
+        print ('Waiting connection...')
+        
+        while 1:
+            # 等待请求并接受(程序会停留在这一旦收到连接请求即开启接受数据的线程)
+            conn, addr = self.s.accept()
+            # 接收数据
+            t = threading.Thread(target=server_method, args=(conn, addr))
+            t.start()
+     
+     
+ 
 def deal_video_data(conn,addr):
+    running = Value('i',1)
+    yolo_running = Value('i',1)
+    process_num = 4
+    process_recv = Process(target=recv_video,args=(conn,addr,process_num,running))
+    process_recv.start()
+    yolo_processes = []
+    
+    for i in range(process_num):
+        p = Process(target=yolo_video,args=(i,running))
+        yolo_processes.append(p)
+        p.start()
+    sleepTime = 41
+    process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/pred'))
+    process_play.start()
+    
+    while True:
+        e = yolo_processes.__len__()
+        for th in yolo_processes:
+            if not th.is_alive():
+                e -= 1
+        if e <= 0:
+            yolo_running = 0
+            break
+        
+    
+    cv.destroyAllWindows()
+    
+    conn.close()
+
+def recv_video(conn,addr,pronum,running):
     print ('Accept new connection from {0}'.format(addr))
     # conn.settimeout(500)
     # 收到请求后的回复
@@ -100,19 +132,28 @@ def deal_video_data(conn,addr):
     conn.send('Hi, Welcome to the server!'.encode('utf-8'))
     fps = conn.recv(16).decode().strip(' ')
     print("video fps is \'{}\'".format(fps))
-    player_queue = [] # 可扩展播放缓存队列
     
     sleepTime = int(1000/float(fps))
+    startTime = time.time()
+    count = 0
     while 1:
-        length = conn.recv(16) #首先接收来自客户端发送的大小信息        
+        length = conn.recv(16).decode() #首先接收来自客户端发送的大小信息        
         if isinstance(length,str) and length:
-            #print(length)
+            print(length)
             l = int(length)
+            count += 1
+            frames_save_path = "./frame/orig{}".format(count%pronum)
             stringData = conn.recv(l)
             # 对接收到的内容解码为图片形式
             data = numpy.fromstring(stringData,dtype='uint8')
             decimg = cv.imdecode(data,1)
-            player_queue.append(decimg)
+            cv.imencode('.jpg', decimg)[1].tofile(frames_save_path + "/%.6d.jpg" % count)
+            '''
+            while data_queue.full():
+                time.sleep(5)
+                
+            data_queue.put(decimg)
+            '''    
             # 播放画面
             #cv.imshow('SERVER',decimg)
         else:
@@ -121,10 +162,86 @@ def deal_video_data(conn,addr):
         if cv.waitKey(sleepTime)==ord('q'):
             break
         '''
-    print(len(player_queue))
-    print("video done!")
-    conn.close()
+    running = 0
+    print("recv time: ",time.time()-startTime)
+    print("video recv done!")
+
+
+
+
+def yolo_video(id,running):
+    os.chdir('./yolo')
+    dir_path = "./frame/orig{}".format(id)
+    count = 0
+    while True:
+        os.system("ls -R ./frame/orig{}/*.jpg > ./frame/orig{}/input.txt".format(id,id))
+        im_dir = os.listdir(dir_path)
+        if not im_dir and not running:
+            break
+        count += len(im_dir) - 1
+        os.system("./darknet{} detect cfg/yolov3-tiny.cfg yolov3-tiny.weights".format(id))
+        os.system("./frame/orig{}/input.txt > rm -rf".format(id))
+    print("process {} finish {} images".format(id,count))     
+        
     
+
+'''
+def frame2video(im_dir,video_dir,fps):
+ 
+    im_list = os.listdir(im_dir)
+    #debug
+    #os.system("echo $(ls -R ./frame/orig/*.jpg)")
+    #print(im_list)
+#    im_list.sort(key=lambda x: int(x.replace("frame","").split('.')[0]))  #最好再看看图片顺序对不
+    im_list.sort()
+    img = Image.open(os.path.join(im_dir,im_list[0]))
+    img_size = img.size #获得图片分辨率，im_dir文件夹下的图片分辨率需要一致
+
+    # fourcc = cv2.cv.CV_FOURCC('M','J','P','G') #opencv版本是2
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v') #opencv版本是3
+    videoWriter = cv2.VideoWriter(video_dir, fourcc, fps, img_size)
+    # count = 1
+    for i in im_list:
+        im_name = os.path.join(im_dir+i)
+        frame = cv.imdecode(np.fromfile(im_name, dtype=np.uint8), -1)
+        videoWriter.write(frame)
+        # count+=1
+        # if (count == 200):
+        #     print(im_name)
+        #     break
+
+    videoWriter.release()
+    print('finish')
+'''   
+def playVideo(conn,addr,sleepTime,yolo_running,im_dir):
+    q = []
+    while True:
+        im_list = os.listdir(im_dir)
+        if not yolo_running and not im_list:
+            break   
+        im_list.sort()
+    
+        for i in im_list:
+            im_name = os.path.join(im_dir+i)
+            np_array = np.fromfile(im_name,dtype = np.uint8)
+            stringData = np_array.tostring()
+            frame = cv.imdecode(np_array,-1)
+            #conn.send(len(stringData).ljust(16).encode())
+            #conn.send(stringData)
+            cv.imshow("server",frame)
+            q.append(frame)
+        
+        
+        
+    print("send back over")    
+        
+    
+    for f in q:
+        cv.imshow('server',f)
+        if cv.waitKey(sleepTime)==ord('q'):
+            break
+    
+
            
         
      

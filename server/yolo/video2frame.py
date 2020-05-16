@@ -17,15 +17,18 @@ def video2frame(videos_path,frames_save_path,time_interval):
   vidcap = cv2.VideoCapture(videos_path)
   success, image = vidcap.read()
   count = 0
-  
+  total_count = vidcap.get(cv2.CAP_PROP_FRAME_COUNT)
   while success:
-    success, image = vidcap.read()
     count += 1
-
+    if count*2 > total_count:
+      frames_save_path = "./frame/orig2"
+    else:
+      frames_save_path = "./frame/orig1"
     if count % time_interval == 0:
       cv2.imencode('.jpg', image)[1].tofile(frames_save_path + "/%.6d.jpg" % count)
     # if count == 20:
     #   break
+    success, image = vidcap.read()
   print(count)
 
  
