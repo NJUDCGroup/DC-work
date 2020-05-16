@@ -97,18 +97,28 @@ class Server():
 def deal_video_data(conn,addr):
     running = Value('i',1)
     yolo_running = Value('i',1)
-    process_num = 4
-    process_recv = Process(target=recv_video,args=(conn,addr,process_num,running))
-    process_recv.start()
-    yolo_processes = []
+    task_kill = Value('i',0)
+    process_num = 2
+    #process_recv = Process(target=recv_video,args=(conn,addr,process_num,running,task_kill))
     
+    #process_recv.start()
+    recv_video(conn,addr,process_num,running,task_kill)
+    
+    while running.value:
+        pass
+    
+    yolo_processes = []
+    '''
     for i in range(process_num):
-        p = Process(target=yolo_video,args=(i,running))
+        p = Process(target=yolo_video,args=(i,running,task_kill))
         yolo_processes.append(p)
         p.start()
+    '''
+    '''
     sleepTime = 41
-    process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/pred'))
+    process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/orig1/',task_kill))
     process_play.start()
+    
     
     while True:
         e = yolo_processes.__len__()
@@ -118,13 +128,17 @@ def deal_video_data(conn,addr):
         if e <= 0:
             yolo_running = 0
             break
-        
-    
+        if cv.waitKey(1) == ord('q'):
+            task_kill.value = 1
+            break
+    while process_play.is_alive():
+        pass
+    '''
     cv.destroyAllWindows()
     
     conn.close()
 
-def recv_video(conn,addr,pronum,running):
+def recv_video(conn,addr,pronum,running,task_kill):
     print ('Accept new connection from {0}'.format(addr))
     # conn.settimeout(500)
     # 收到请求后的回复
@@ -136,13 +150,15 @@ def recv_video(conn,addr,pronum,running):
     sleepTime = int(1000/float(fps))
     startTime = time.time()
     count = 0
-    while 1:
-        length = conn.recv(16).decode() #首先接收来自客户端发送的大小信息        
+    print(task_kill.value)
+    while task_kill.value == 0:
+        print('aaa')
+        length = conn.recv(16) #首先接收来自客户端发送的大小信息        
         if isinstance(length,str) and length:
             print(length)
             l = int(length)
             count += 1
-            frames_save_path = "./frame/orig{}".format(count%pronum)
+            frames_save_path = "./yolo/frame/orig{}".format(count%pronum)
             stringData = conn.recv(l)
             # 对接收到的内容解码为图片形式
             data = numpy.fromstring(stringData,dtype='uint8')
@@ -157,27 +173,32 @@ def recv_video(conn,addr,pronum,running):
             # 播放画面
             #cv.imshow('SERVER',decimg)
         else:
+            print("quit")
             break
         '''
         if cv.waitKey(sleepTime)==ord('q'):
             break
         '''
-    running = 0
+    running.value = 0
     print("recv time: ",time.time()-startTime)
     print("video recv done!")
 
 
 
 
-def yolo_video(id,running):
+def yolo_video(id,running,task_kill):
     os.chdir('./yolo')
     dir_path = "./frame/orig{}".format(id)
     count = 0
-    while True:
+    while not task_kill.value:
         os.system("ls -R ./frame/orig{}/*.jpg > ./frame/orig{}/input.txt".format(id,id))
         im_dir = os.listdir(dir_path)
-        if not im_dir and not running:
+        if not im_dir and not running.value:
             break
+        if not im_dir:
+            print("空")
+            time.sleep(500)
+            continue
         count += len(im_dir) - 1
         os.system("./darknet{} detect cfg/yolov3-tiny.cfg yolov3-tiny.weights".format(id))
         os.system("./frame/orig{}/input.txt > rm -rf".format(id))
@@ -213,17 +234,17 @@ def frame2video(im_dir,video_dir,fps):
     videoWriter.release()
     print('finish')
 '''   
-def playVideo(conn,addr,sleepTime,yolo_running,im_dir):
+def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
     q = []
-    while True:
+    while not task_kill.value:
         im_list = os.listdir(im_dir)
-        if not yolo_running and not im_list:
+        if not yolo_running.value and not im_list:
             break   
         im_list.sort()
     
         for i in im_list:
             im_name = os.path.join(im_dir+i)
-            np_array = np.fromfile(im_name,dtype = np.uint8)
+            np_array = numpy.fromfile(im_name,dtype = numpy.uint8)
             stringData = np_array.tostring()
             frame = cv.imdecode(np_array,-1)
             #conn.send(len(stringData).ljust(16).encode())
