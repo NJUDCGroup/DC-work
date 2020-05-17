@@ -106,18 +106,18 @@ def deal_video_data(conn,addr):
     
     
     yolo_processes = []
-    '''
+    
     for i in range(process_num):
         p = Process(target=yolo_video,args=(i,running,task_kill))
         yolo_processes.append(p)
         p.start()
-    '''
+    
     
     sleepTime = 41
     process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/orig0/',task_kill))
     process_play.start()
     
-    '''
+    
     while True:
         e = yolo_processes.__len__()
         for th in yolo_processes:
@@ -129,7 +129,7 @@ def deal_video_data(conn,addr):
         if cv.waitKey(1) == ord('q'):
             task_kill.value = 1
             break
-    '''
+    
     while process_play.is_alive():
         pass
     
@@ -188,20 +188,21 @@ def yolo_video(id,running,task_kill):
     os.chdir('./yolo')
     dir_path = "./frame/orig{}".format(id)
     count = 0
-    while not task_kill.value:
+    while not task_kill:
         os.system("ls -R ./frame/orig{}/*.jpg > ./frame/orig{}/input.txt".format(id,id))
         im_dir = os.listdir(dir_path)
-        if not im_dir and not running.value:
-            break
-        if not im_dir:
-            print("空")
+        print(im_dir)
+        if len(im_dir)<=1:
+            if not running.value:
+                break
+            print("empty")
             time.sleep(0.5)
             continue
         count += len(im_dir) - 1
         os.system("./darknet{} detect cfg/yolov3-tiny.cfg yolov3-tiny.weights".format(id))
-        os.system("./frame/orig{}/input.txt > rm -rf".format(id))
+        os.system("cat ./frame/orig{}/input.txt |xargs rm -rf".format(id))
     print("process {} finish {} images".format(id,count))     
-        
+    return count    
     
 
  
@@ -245,7 +246,9 @@ def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
         
      
 if __name__ == "__main__":
+    '''
     server = Server()
     server.setup('127.0.0.1',8005)
     server.serverStart(deal_video_data)  
-            
+    '''
+    yolo_video(0,1,0)       
