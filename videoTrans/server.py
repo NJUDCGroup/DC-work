@@ -73,7 +73,7 @@ class Server():
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            # 绑定端口为9001
+            # 绑定端口
             self.s.bind((ip, port))
             # 设置监听数
             self.s.listen(10)
@@ -99,13 +99,11 @@ def deal_video_data(conn,addr):
     yolo_running = Value('i',1)
     task_kill = Value('i',0)
     process_num = 2
-    #process_recv = Process(target=recv_video,args=(conn,addr,process_num,running,task_kill))
+    process_recv = Process(target=recv_video,args=(conn,addr,process_num,running,task_kill))
     
-    #process_recv.start()
-    recv_video(conn,addr,process_num,running,task_kill)
+    process_recv.start()
+    #recv_video(conn,addr,process_num,running,task_kill)
     
-    while running.value:
-        pass
     
     yolo_processes = []
     '''
@@ -114,12 +112,12 @@ def deal_video_data(conn,addr):
         yolo_processes.append(p)
         p.start()
     '''
-    '''
+    
     sleepTime = 41
-    process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/orig1/',task_kill))
+    process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/orig0/',task_kill))
     process_play.start()
     
-    
+    '''
     while True:
         e = yolo_processes.__len__()
         for th in yolo_processes:
@@ -131,9 +129,10 @@ def deal_video_data(conn,addr):
         if cv.waitKey(1) == ord('q'):
             task_kill.value = 1
             break
+    '''
     while process_play.is_alive():
         pass
-    '''
+    
     cv.destroyAllWindows()
     
     conn.close()
@@ -150,26 +149,25 @@ def recv_video(conn,addr,pronum,running,task_kill):
     sleepTime = int(1000/float(fps))
     startTime = time.time()
     count = 0
+    frames_save_pathes = ["./yolo/frame/orig{}".format(i) for i in range(pronum)]
     print(task_kill.value)
     while task_kill.value == 0:
-        print('aaa')
         length = conn.recv(16) #首先接收来自客户端发送的大小信息        
         if isinstance(length,str) and length:
             print(length)
             l = int(length)
+            if l < 0:
+                print('quit')
+                break
+            
             count += 1
-            frames_save_path = "./yolo/frame/orig{}".format(count%pronum)
             stringData = conn.recv(l)
             # 对接收到的内容解码为图片形式
             data = numpy.fromstring(stringData,dtype='uint8')
+            
             decimg = cv.imdecode(data,1)
-            cv.imencode('.jpg', decimg)[1].tofile(frames_save_path + "/%.6d.jpg" % count)
-            '''
-            while data_queue.full():
-                time.sleep(5)
-                
-            data_queue.put(decimg)
-            '''    
+            cv.imencode('.jpg', decimg)[1].tofile(frames_save_pathes[count%pronum] + "/%.6d.jpg" % count)
+ 
             # 播放画面
             #cv.imshow('SERVER',decimg)
         else:
@@ -197,7 +195,7 @@ def yolo_video(id,running,task_kill):
             break
         if not im_dir:
             print("空")
-            time.sleep(500)
+            time.sleep(0.5)
             continue
         count += len(im_dir) - 1
         os.system("./darknet{} detect cfg/yolov3-tiny.cfg yolov3-tiny.weights".format(id))
@@ -206,36 +204,12 @@ def yolo_video(id,running,task_kill):
         
     
 
-'''
-def frame2video(im_dir,video_dir,fps):
  
-    im_list = os.listdir(im_dir)
-    #debug
-    #os.system("echo $(ls -R ./frame/orig/*.jpg)")
-    #print(im_list)
-#    im_list.sort(key=lambda x: int(x.replace("frame","").split('.')[0]))  #最好再看看图片顺序对不
-    im_list.sort()
-    img = Image.open(os.path.join(im_dir,im_list[0]))
-    img_size = img.size #获得图片分辨率，im_dir文件夹下的图片分辨率需要一致
-
-    # fourcc = cv2.cv.CV_FOURCC('M','J','P','G') #opencv版本是2
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v') #opencv版本是3
-    videoWriter = cv2.VideoWriter(video_dir, fourcc, fps, img_size)
-    # count = 1
-    for i in im_list:
-        im_name = os.path.join(im_dir+i)
-        frame = cv.imdecode(np.fromfile(im_name, dtype=np.uint8), -1)
-        videoWriter.write(frame)
-        # count+=1
-        # if (count == 200):
-        #     print(im_name)
-        #     break
-
-    videoWriter.release()
-    print('finish')
-'''   
 def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
     q = []
+    print("play start")
+    conn.send("start".ljust(10).encode())
+    
     while not task_kill.value:
         im_list = os.listdir(im_dir)
         if not yolo_running.value and not im_list:
@@ -243,25 +217,29 @@ def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
         im_list.sort()
     
         for i in im_list:
+            print("send {}".format(i))
             im_name = os.path.join(im_dir+i)
-            np_array = numpy.fromfile(im_name,dtype = numpy.uint8)
-            stringData = np_array.tostring()
-            frame = cv.imdecode(np_array,-1)
-            #conn.send(len(stringData).ljust(16).encode())
-            #conn.send(stringData)
-            cv.imshow("server",frame)
-            q.append(frame)
+            img = cv.imread(im_name)
+            result,imgencode = cv.imencode(".jpg",img)
+            data = numpy.array(imgencode)
+            stringData = data.tostring()
+            print(len(stringData))
+            conn.send(str(len(stringData)).ljust(16).encode())
+            conn.send(stringData)
+            q.append(img)
+            os.remove(im_name)
         
         
         
+    conn.send(str(-1).ljust(16).encode())
     print("send back over")    
         
-    
+    '''
     for f in q:
         cv.imshow('server',f)
         if cv.waitKey(sleepTime)==ord('q'):
             break
-    
+    '''
 
            
         

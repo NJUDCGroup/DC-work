@@ -6,6 +6,11 @@ import struct
 import sys,os
 import cv2 as cv
 import numpy
+import Queue
+import time
+from multiprocessing import Process 
+play_sign = 0
+end_sign = 0
 class Client():
     def __init__(self):
         pass
@@ -98,7 +103,7 @@ class Client():
                 data = numpy.array(imgencode)
                 stringData = data.tostring()
                 # 首先发送图片编码后的长度
-                self.s.send(str(len(stringData)).ljust(16).encode())
+                self.s.send(str(len(stringData)).ljust(16).encode('utf-8'))
                 # 然后发送图片内容
                 self.s.send(stringData)
                 '''
@@ -106,14 +111,82 @@ class Client():
                     print("video sending has been break")
                     break
                 '''
+            self.s.send(str(-1).ljust(16).encode('utf-8'))
             print("video sending over!")
+            
             cap.release()
+    def recvVideo(self):
+        global play_sign
+        global end_sign
+        q = Queue.Queue()
+        
+        print("start recving")
+        h = self.s.recv(10)
+        print(h)
+        
+        play = threading.Thread(target=playVideo,args=(q,41))
+        play.start()
+        while True:
+            length = self.s.recv(16)
+            
+            if isinstance(length,str) and length:
+                print(length)
+                l = int(length)
+                if l < 0:
+                    break
+                stringData = self.s.recv(l)
+                data = numpy.fromstring(stringData,dtype='uint8')
+                decimg = cv.imdecode(data,1)
+                q.put(decimg)
                 
+            else:                
+                break       
+        '''    
+        print("start play")
+        while not q.empty():
+            cv.imshow("client",q.get())
+            if cv.waitKey(41) == ord('q'):
+                break
+        '''
+        play_sign = 1
+        end_sign = 1
+        print("end!!!!!")
+        # cv.destroyAllWindows()
+
+def playVideo(q,sleepTime):
+    global play_sign
+    global end_sign
+    while True:
+        if play_sign == 0:
+            time.sleep(sleepTime/100.0)
+            print("wait")
+            continue
+
+        if not q.empty():
+            cv.imshow("client",q.get())
+        else:
+            if end_sign:
+                break
+            print("block!")
+        if cv.waitKey(sleepTime) == ord('q'):
+            break
+    
+         
 if __name__ == '__main__':
     client = Client()
     client.setup('127.0.0.1',8005)
 
     #size = client.sendIMG('dog.jpg')
     #client.recvIMG(size)
-    client.sendVideo('../test.mp4')
+    send = threading.Thread(target=client.sendVideo,args=('../test.mp4',))
+    recv = threading.Thread(target=client.recvVideo)
+    
+    send.start()
+    recv.start()
+    
+    while send.is_alive() or recv.is_alive():
+        time.sleep(0.5)
+    
+    #client.sendVideo('../test.mp4')
+    #client.recvVideo()
     client.closeSocket()
