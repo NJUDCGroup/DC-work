@@ -119,7 +119,7 @@ class Client():
         global play_sign
         global end_sign
         q = Queue.Queue()
-        
+        play_sign = 0
         print("start recving")
         h = self.s.recv(10)
         print(h)

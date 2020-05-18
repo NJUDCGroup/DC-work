@@ -7,6 +7,7 @@ import os
 import numpy
 import cv2 as cv
 import time
+import re
 from multiprocessing import Process,Value 
 def deal_data(conn, addr):
     print ('Accept new connection from {0}'.format(addr))
@@ -98,7 +99,7 @@ def deal_video_data(conn,addr):
     running = Value('i',1)
     yolo_running = Value('i',1)
     task_kill = Value('i',0)
-    process_num = 2
+    process_num = 4
     process_recv = Process(target=recv_video,args=(conn,addr,process_num,running,task_kill))
     
     process_recv.start()
@@ -111,29 +112,31 @@ def deal_video_data(conn,addr):
         p = Process(target=yolo_video,args=(i,running,task_kill))
         yolo_processes.append(p)
         p.start()
-    
+    ''''''
     
     sleepTime = 41
-    process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/orig0/',task_kill))
+    process_play = Process(target=playVideo,args=(conn,addr,sleepTime,yolo_running,'./yolo/frame/pred/',task_kill))
     process_play.start()
     
-    
+    startTime = time.time() 
     while True:
         e = yolo_processes.__len__()
         for th in yolo_processes:
             if not th.is_alive():
                 e -= 1
         if e <= 0:
-            yolo_running = 0
+            yolo_running.value = 0
+            print("yolo running stop!")
+            endTime = time.time()
+            print("yolo time:{}".format(endTime-startTime))
             break
+        '''
         if cv.waitKey(1) == ord('q'):
             task_kill.value = 1
             break
-    
-    while process_play.is_alive():
-        pass
-    
-    cv.destroyAllWindows()
+        '''
+        time.sleep(1)
+    # cv.destroyAllWindows()
     
     conn.close()
 
@@ -188,12 +191,12 @@ def yolo_video(id,running,task_kill):
     os.chdir('./yolo')
     dir_path = "./frame/orig{}".format(id)
     count = 0
-    while not task_kill:
+    while not task_kill.value:
         os.system("ls -R ./frame/orig{}/*.jpg > ./frame/orig{}/input.txt".format(id,id))
         im_dir = os.listdir(dir_path)
-        print(im_dir)
         if len(im_dir)<=1:
             if not running.value:
+                
                 break
             print("empty")
             time.sleep(0.5)
@@ -214,17 +217,42 @@ def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
     while not task_kill.value:
         im_list = os.listdir(im_dir)
         if not yolo_running.value and not im_list:
+            print("play process end!")
             break   
         im_list.sort()
-    
-        for i in im_list:
+        print(im_list)
+        if not im_list:
+            time.sleep(10)
+            continue
+        im_part = im_list[:10]
+        im_tosend = [int(re.findall(r"\d+",i)[0]) for i in im_part]
+        #print(im_tosend)
+        if len(im_tosend)<10 and yolo_running.value:
+            print("wait for more to send {}".format(yolo_running.value))
+            time.sleep(10)
+            continue
+        c = -1
+        for i in range(len(im_tosend)-1):  # 连续性检验
+            if im_tosend[i]+1 == im_tosend[i+1]:
+                pass
+            else:
+                c = i
+        if c>=0:
+            print("wait for img {}".format(im_tosend[c]))
+            time.sleep(5)
+            continue
+        
+        for i in im_part:
             print("send {}".format(i))
             im_name = os.path.join(im_dir+i)
             img = cv.imread(im_name)
+            if img is None or img.size==0:
+                os.remove(im_name)
+                continue
             result,imgencode = cv.imencode(".jpg",img)
             data = numpy.array(imgencode)
             stringData = data.tostring()
-            print(len(stringData))
+            # print(len(stringData))
             conn.send(str(len(stringData)).ljust(16).encode())
             conn.send(stringData)
             q.append(img)
@@ -246,9 +274,8 @@ def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
         
      
 if __name__ == "__main__":
-    '''
+    
     server = Server()
     server.setup('127.0.0.1',8005)
     server.serverStart(deal_video_data)  
-    '''
-    yolo_video(0,1,0)       
+       
