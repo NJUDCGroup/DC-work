@@ -99,7 +99,7 @@ def deal_video_data(conn,addr):
     running = Value('i',1)
     yolo_running = Value('i',1)
     task_kill = Value('i',0)
-    process_num = 4
+    process_num = 3
     process_recv = Process(target=recv_video,args=(conn,addr,process_num,running,task_kill))
     
     process_recv.start()
