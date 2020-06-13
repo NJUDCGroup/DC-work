@@ -276,6 +276,6 @@ def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
 if __name__ == "__main__":
     
     server = Server()
-    server.setup('127.0.0.1',8005)
+    server.setup('127.0.0.1',8006)
     server.serverStart(deal_video_data)  
        

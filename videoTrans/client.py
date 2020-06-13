@@ -192,11 +192,10 @@ def playVideo(q):
          
 if __name__ == '__main__':
     client = Client()
-    client.setup('127.0.0.1',8005)
-
+    client.setup('127.0.0.1',8006)
     #size = client.sendIMG('dog.jpg')
     #client.recvIMG(size)
-    send = threading.Thread(target=client.sendVideo,args=('../test4.mp4',))
+    send = threading.Thread(target=client.sendVideo,args=('./video/test4.mp4',))
     recv = threading.Thread(target=client.recvVideo)
     
     send.start()
