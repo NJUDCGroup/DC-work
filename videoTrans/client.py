@@ -196,7 +196,7 @@ if __name__ == '__main__':
 
     #size = client.sendIMG('dog.jpg')
     #client.recvIMG(size)
-    send = threading.Thread(target=client.sendVideo,args=('../test.mp4',))
+    send = threading.Thread(target=client.sendVideo,args=('../test4.mp4',))
     recv = threading.Thread(target=client.recvVideo)
     
     send.start()
