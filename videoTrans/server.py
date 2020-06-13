@@ -213,7 +213,7 @@ def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
     q = []
     print("play start")
     conn.send("start".ljust(10).encode())
-    
+    picture_cache_size = 60
     while not task_kill.value:
         im_list = os.listdir(im_dir)
         if not yolo_running.value and not im_list:
@@ -224,12 +224,12 @@ def playVideo(conn,addr,sleepTime,yolo_running,im_dir,task_kill):
         if not im_list:
             time.sleep(10)
             continue
-        im_part = im_list[:10]
+        im_part = im_list[:picture_cache_size]
         im_tosend = [int(re.findall(r"\d+",i)[0]) for i in im_part]
         #print(im_tosend)
-        if len(im_tosend)<10 and yolo_running.value:
+        if len(im_tosend)<picture_cache_size and yolo_running.value:
             print("wait for more to send {}".format(yolo_running.value))
-            time.sleep(10)
+            time.sleep(20)
             continue
         c = -1
         for i in range(len(im_tosend)-1):  # 连续性检验

@@ -8,7 +8,7 @@ import struct
 def socket_client():
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('127.0.0.1', 9001))
+        s.connect(('192.168.1.100', 9001))
     except socket.error as msg:
         print (msg)
         sys.exit(1)
